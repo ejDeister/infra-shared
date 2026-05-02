@@ -26,7 +26,17 @@ jobs:
       - name: Init (local backend)
         run: terraform init -backend=false
 
-      - name: Apply state backend only
+      - name: Import existing state backend resources (if they exist)
+        run: |
+          terraform import module.state_backend.aws_s3_bucket.tfstate ethandeister-tfstate || true
+          terraform import module.state_backend.aws_s3_bucket_versioning.tfstate ethandeister-tfstate || true
+          terraform import module.state_backend.aws_s3_bucket_public_access_block.tfstate ethandeister-tfstate || true
+          terraform import module.state_backend.aws_s3_bucket_server_side_encryption_configuration.tfstate ethandeister-tfstate || true
+          terraform import module.state_backend.aws_dynamodb_table.tf_lock terraform-locks || true
+        env:
+          TF_VAR_alert_email: ${{ secrets.TF_VAR_alert_email }}
+
+      - name: Apply state backend
         run: terraform apply -auto-approve -target=module.state_backend -var="alert_email=${{ secrets.TF_VAR_alert_email }}"
 
       - name: Migrate state to S3
