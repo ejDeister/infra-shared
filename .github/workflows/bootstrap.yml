@@ -26,10 +26,13 @@ jobs:
       - name: Init (local backend)
         run: terraform init -backend=false
 
-      - name: Apply
-        run: terraform apply -auto-approve -var="alert_email=${{ secrets.TF_VAR_alert_email }}"
+      - name: Apply state backend only
+        run: terraform apply -auto-approve -target=module.state_backend -var="alert_email=${{ secrets.TF_VAR_alert_email }}"
 
-      - name: Init (migrate to S3)
-        run: terraform init -migrate-state
+      - name: Migrate state to S3
+        run: terraform init -migrate-state -force-copy
         env:
           TF_CLI_ARGS_init: "-input=false"
+
+      - name: Apply remaining resources
+        run: terraform apply -auto-approve -var="alert_email=${{ secrets.TF_VAR_alert_email }}"
