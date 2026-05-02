@@ -38,3 +38,8 @@ variable "budget_target_user_names" {
   type    = list(string)
   default = []
 }
+
+variable "github_repo" {
+  type        = string
+  description = "GitHub repo in owner/name format, used for OIDC trust policy"
+}

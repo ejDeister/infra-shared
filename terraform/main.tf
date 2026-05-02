@@ -52,7 +52,7 @@ resource "aws_iam_role" "shared_infra_deploy" {
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:ejDeister/infra-shared:*"
+          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:*"
         }
       }
     }]
