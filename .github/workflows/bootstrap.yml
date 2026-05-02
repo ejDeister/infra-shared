@@ -21,10 +21,33 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-2
 
-      - name: Clean up any orphaned state backend resources
+      - name: Clean up any orphaned resources
+        env:
+          ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
         run: |
           aws s3 rb s3://ethandeister-tfstate --force 2>/dev/null || true
           aws dynamodb delete-table --table-name terraform-locks 2>/dev/null || true
+          aws budgets delete-budget --account-id $ACCOUNT_ID --budget-name monthly-cap 2>/dev/null || true
+          aws iam delete-policy --policy-arn arn:aws:iam::${ACCOUNT_ID}:policy/budget-deny-all 2>/dev/null || true
+          INLINE=$(aws iam list-role-policies --role-name budget-action-role --query 'PolicyNames[0]' --output text 2>/dev/null)
+          [ -n "$INLINE" ] && [ "$INLINE" != "None" ] && aws iam delete-role-policy --role-name budget-action-role --policy-name $INLINE 2>/dev/null || true
+          aws iam delete-role --role-name budget-action-role 2>/dev/null || true
+          aws iam detach-role-policy --role-name shared-infra-deploy --policy-arn arn:aws:iam::aws:policy/AdministratorAccess 2>/dev/null || true
+          aws iam delete-role --role-name shared-infra-deploy 2>/dev/null || true
+          aws iam delete-open-id-connect-provider --open-id-connect-provider-arn arn:aws:iam::${ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com 2>/dev/null || true
+          aws logs delete-log-group --log-group-name /shared-infra 2>/dev/null || true
+          for arn in $(aws acm list-certificates --region us-west-2 --query "CertificateSummaryList[?DomainName=='*.ethandeister.com'].CertificateArn" --output text); do
+            aws acm delete-certificate --certificate-arn $arn 2>/dev/null || true
+          done
+          aws route53 list-resource-record-sets --hosted-zone-id Z03972301J6XXRN7TN53X \
+            --query "ResourceRecordSets[?Type=='CNAME']" --output json | \
+            jq -r '.[] | @json' | while read record; do
+              name=$(echo $record | jq -r '.Name')
+              value=$(echo $record | jq -r '.ResourceRecords[0].Value')
+              aws route53 change-resource-record-sets \
+                --hosted-zone-id Z03972301J6XXRN7TN53X \
+                --change-batch "{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":{\"Name\":\"$name\",\"Type\":\"CNAME\",\"TTL\":60,\"ResourceRecords\":[{\"Value\":\"$value\"}]}}]}" 2>/dev/null || true
+            done
           sleep 15
 
       - uses: hashicorp/setup-terraform@v3
