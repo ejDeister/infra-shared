@@ -1,0 +1,35 @@
+name: Bootstrap
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Init (local backend)
+        run: terraform init -backend=false
+
+      - name: Apply
+        run: terraform apply -auto-approve -var="alert_email=${{ secrets.TF_VAR_alert_email }}"
+
+      - name: Init (migrate to S3)
+        run: terraform init -migrate-state
+        env:
+          TF_CLI_ARGS_init: "-input=false"
