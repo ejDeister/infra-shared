@@ -16,6 +16,11 @@ module "state_backend" {
   bucket_name = var.state_bucket_name
 }
 
+import {
+  to = module.dns.aws_route53_zone.main
+  id = var.existing_zone_id
+}
+
 module "dns" {
   source      = "./modules/dns"
   domain_name = var.domain_name
